@@ -7,20 +7,49 @@ and automatic Excel (CSV) logging — currently in **paper-trading mode**.
 ---
 
 ## 🧠 WHAT THIS PROJECT DOES
+# Options_ORB_Automation
 
-This project automates the **15-minute Opening Range Breakout (ORB)** strategy for NIFTY options using tick data from the Kite API.  
-It includes:
+Fully automated **15-minute Opening Range Breakout (ORB)** strategy for **NIFTY options**
+using **tick-by-tick Kite data**, implemented in **paper-trading mode**.
+
+This project removes emotional execution and validates ORB behaviour
+before going live.
+
+---
+
+## FEATURES
 
 ✔ Tick-by-tick WebSocket data  
-✔ 15-min ORB range (built from 5-min candles)  
-✔ 45-second breakout hold logic  
+✔ Automatic ORB calculation (9:15–9:30)  
+✔ 45-second breakout acceptance  
+✔ CE & PE handling  
 ✔ Session-only volume filter  
-✔ Automatic ATM strike selection (CE & PE)  
-✔ Re-entry logic (1 repeat trade allowed)  
-✔ Kill-switch with **daily max loss**  
-✔ Auto Excel/CSV logging (trade log + daily summary)
+✔ Automatic ATM strike selection  
+✔ Trailing SL + 2R target  
+✔ Re-entry cooldown (anti-chop)  
+✔ Daily max-loss kill switch  
+✔ Excel/CSV trade logging  
 
-This is a **paper-trading engine** designed for validation before going live.
+---
+
+## STRATEGY LOGIC
+
+### ENTRY
+- Break above ORB High → Buy ATM CE  
+- Break below ORB Low → Buy ATM PE  
+- Price must hold beyond ORB for 45 seconds  
+- Volume must expand vs session average  
+
+### EXIT
+- Trailing SL
+- Target = 2 × risk
+- Kill switch on daily loss
+
+---
+
+## FILE STRUCTURE
+
+ designed for validation before going live.
 
 ---
 
