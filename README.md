@@ -11,3 +11,17 @@ FULLY AUTOMATED ORB PAPER TRADING with Kite API, including:
 ✔ Re-entry logic
 ✔ Kill switch + daily max loss
 ✔ Automatic Excel (CSV) logging
+
+Project Structure
+orb_paper_trading/
+│
+├── config.py
+├── kite_connection.py
+├── instruments.py
+├── orb_logic.py
+├── paper_engine.py
+├── logger.py
+├── main.py
+│
+├── paper_trades.csv        ← auto-created
+├── daily_summary.csv       ← auto-created
