@@ -1,35 +1,90 @@
 from kite_connection import kite, kws
 from instruments import load_nifty_options, get_atm_option
-from orb_logic import check_hold
-from paper_engine import paper_entry, paper_exit, in_trade, kill_switch
-from config import NIFTY_TOKEN, HOLD_SECONDS
+from orb_logic import compute_orb, check_hold, update_volume, volume_ok
+from paper_engine import (
+    paper_entry,
+    paper_exit,
+    in_trade,
+    kill_switch,
+    can_reenter,
+    check_exit,
+    symbol
+)
+from config import (
+    NIFTY_TOKEN,
+    HOLD_SECONDS,
+    VOLUME_MULTIPLIER
+)
 from logger import init_logs
+
+# ---------------- INIT ---------------- #
 
 init_logs()
 OPTIONS = load_nifty_options(kite)
 
-orb_high = None
-orb_low = None
+# Compute ORB automatically (9:15–9:30)
+orb_high, orb_low = compute_orb(kite, NIFTY_TOKEN)
+print(f"ORB READY | HIGH={orb_high} LOW={orb_low}")
+
+# ---------------- SAFE LTP ---------------- #
+
+def safe_ltp(symbol):
+    try:
+        return kite.ltp(symbol)[symbol]["last_price"]
+    except Exception as e:
+        print("LTP error:", e)
+        return None
+
+# ---------------- TICK HANDLER ---------------- #
 
 def on_ticks(ws, ticks):
-    global orb_high, orb_low
+    try:
+        if kill_switch:
+            return
 
-    price = ticks[0]["last_price"]
+        tick = ticks[0]
+        spot_price = tick["last_price"]
 
-    # ORB already calculated manually at 9:30
-    if kill_switch:
-        return
+        # Update rolling volume buckets
+        update_volume(tick)
 
-    if not in_trade:
-        if check_hold(price, orb_high, HOLD_SECONDS):
-            sym = get_atm_option(OPTIONS, price, "CE")
-            opt_price = kite.ltp(f"NFO:{sym}")[f"NFO:{sym}"]["last_price"]
-            paper_entry(opt_price, sym)
+        # ---------------- ENTRY ---------------- #
+        if not in_trade and can_reenter():
 
-    else:
-        if price < orb_high:
-            opt_price = kite.ltp(f"NFO:{symbol}")[f"NFO:{symbol}"]["last_price"]
-            paper_exit(opt_price, "Spot SL")
+            # BULLISH ORB
+            if (
+                spot_price > orb_high and
+                check_hold(spot_price, orb_high, HOLD_SECONDS, "CE") and
+                volume_ok(VOLUME_MULTIPLIER)
+            ):
+                sym = get_atm_option(OPTIONS, spot_price, "CE")
+                opt_price = safe_ltp(f"NFO:{sym}")
+                if opt_price:
+                    paper_entry(opt_price, sym)
+
+            # BEARISH ORB
+            elif (
+                spot_price < orb_low and
+                check_hold(spot_price, orb_low, HOLD_SECONDS, "PE") and
+                volume_ok(VOLUME_MULTIPLIER)
+            ):
+                sym = get_atm_option(OPTIONS, spot_price, "PE")
+                opt_price = safe_ltp(f"NFO:{sym}")
+                if opt_price:
+                    paper_entry(opt_price, sym)
+
+        # ---------------- EXIT ---------------- #
+        elif in_trade:
+            opt_price = safe_ltp(f"NFO:{symbol}")
+            if opt_price:
+                reason = check_exit(opt_price)
+                if reason:
+                    paper_exit(opt_price, reason)
+
+    except Exception as e:
+        print("Tick processing error:", e)
+
+# ---------------- WEBSOCKET ---------------- #
 
 def on_connect(ws, response):
     ws.subscribe([NIFTY_TOKEN])
