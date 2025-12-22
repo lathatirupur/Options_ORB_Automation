@@ -3,7 +3,8 @@ from config import (
     LOT_SIZE,
     DAILY_MAX_LOSS,
     RISK_POINTS,
-    REENTRY_COOLDOWN
+    REENTRY_COOLDOWN,
+    MAX_SL_PER_DAY
 )
 from logger import log_trade, update_summary
 
@@ -20,11 +21,27 @@ kill_switch = False
 
 reentry_used = False
 last_exit_time = None
+first_breakout_volume = None
+sl_count = 0
 
 
-# ---- Entry ----
-def paper_entry(price, sym, trade_direction):
-    global in_trade, entry_price, entry_time, symbol, direction, trail_sl
+def reset_daily_state():
+    global reentry_used, first_breakout_volume, sl_count
+    reentry_used = False
+    first_breakout_volume = None
+    sl_count = 0
+
+
+def can_reenter():
+    if not reentry_used:
+        return True
+    if not last_exit_time:
+        return False
+    return (datetime.now() - last_exit_time).seconds >= REENTRY_COOLDOWN
+
+
+def paper_entry(price, sym, trade_direction, breakout_volume):
+    global in_trade, entry_price, entry_time, symbol, direction, trail_sl, first_breakout_volume
 
     in_trade = True
     entry_price = price
@@ -32,13 +49,14 @@ def paper_entry(price, sym, trade_direction):
     symbol = sym
     direction = trade_direction
 
-    # Initial hard SL = 1R
     trail_sl = entry_price - RISK_POINTS
 
+    if first_breakout_volume is None:
+        first_breakout_volume = breakout_volume
 
-# ---- Exit ----
+
 def paper_exit(price, reason):
-    global in_trade, daily_pnl, kill_switch, reentry_used, last_exit_time
+    global in_trade, daily_pnl, kill_switch, reentry_used, last_exit_time, sl_count
 
     pnl = (price - entry_price) * LOT_SIZE
     daily_pnl += pnl
@@ -60,51 +78,39 @@ def paper_exit(price, reason):
     reentry_used = True
     last_exit_time = datetime.now()
 
-    if daily_pnl <= -DAILY_MAX_LOSS:
+    if "SL" in reason:
+        sl_count += 1
+
+    if sl_count >= MAX_SL_PER_DAY or daily_pnl <= -DAILY_MAX_LOSS:
         kill_switch = True
 
 
-# ---- Re-entry guard ----
-def can_reenter():
-    if reentry_used is False:
-        return True
-    if not last_exit_time:
-        return False
-    return (datetime.now() - last_exit_time).seconds >= REENTRY_COOLDOWN
-
-
-# ---- Progressive R-based trailing SL ----
 def check_exit(current_price):
     """
-    Priority-2 exit:
-    Progressive + dynamic R-based trailing SL.
-    Exit ONLY on trailing SL hit.
+    Priority-2 exit: Progressive + dynamic R-based trailing
     """
-
-    global trail_sl, entry_price
+    global trail_sl
 
     R = RISK_POINTS
-    move_from_entry = current_price - entry_price
+    move = current_price - entry_price
 
-    # ---- Initial R locking ----
-    if move_from_entry >= 4 * R:
-        completed_r_multiples = int(move_from_entry / R)
-        locked_profit_r = completed_r_multiples - 1
-        trail_sl = entry_price + (locked_profit_r * R)
+    if move >= 4 * R:
+        completed_r = int(move / R)
+        locked_r = completed_r - 1
+        trail_sl = entry_price + (locked_r * R)
 
-    elif move_from_entry >= 3 * R:
+    elif move >= 3 * R:
         trail_sl = entry_price + (2 * R)
 
-    elif move_from_entry >= 2 * R:
+    elif move >= 2 * R:
         trail_sl = entry_price + (1 * R)
 
-    elif move_from_entry >= 1.5 * R:
+    elif move >= 1.5 * R:
         trail_sl = entry_price + (0.5 * R)
 
-    elif move_from_entry >= 1 * R:
-        trail_sl = entry_price  # cost-to-cost
+    elif move >= 1 * R:
+        trail_sl = entry_price
 
-    # ---- Exit check ----
     if current_price <= trail_sl:
         return "Trailing SL Hit"
 
