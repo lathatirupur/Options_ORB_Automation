@@ -25,3 +25,11 @@ orb_paper_trading/
 │
 ├── paper_trades.csv        ← auto-created
 ├── daily_summary.csv       ← auto-created
+
+HOW TO RUN (STEP-BY-STEP)
+pip install kiteconnect pandas
+python main.py
+
+📂 Open:
+paper_trades.csv → Trade-by-trade journal
+daily_summary.csv → Daily P&L
