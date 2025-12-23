@@ -151,9 +151,10 @@ Options_ORB_Automation/
 
 ## 🚀 HOW TO RUN (PAPER MODE)
 
-1️⃣ Install Dependencies  
+1️⃣ Install Dependencies
+```
 pip install kiteconnect pandas
-
+```
 2️⃣ Configure API  
 
 Fill in your Kite credentials in config.py:
@@ -162,8 +163,9 @@ API_KEY = "your_key"
 ACCESS_TOKEN = "your_token"
 
 3️⃣ Run the Bot  
+```
 python main.py
-
+```
 4️⃣ Review Results  
 
 paper_trades.csv → Detailed trade-by-trade history  
