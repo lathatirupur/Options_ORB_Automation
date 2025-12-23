@@ -1,173 +1,211 @@
 # Options_ORB_Automation
 
-Fully automated Opening Range Breakout (ORB) strategy for NIFTY options  
-with *tick-by-tick data*, automatic ATM strike selection, re-entry logic, kill-switch  
-and automatic Excel (CSV) logging — currently in **paper-trading mode**.
+A **fully automated Opening Range Breakout (ORB)** system for **NIFTY option buying**,  
+built using **tick-by-tick Kite WebSocket data**, with **strict rule enforcement**,  
+**paper trading**, and **automated performance analytics**.
+
+This project is designed to **validate ORB behaviour objectively**  
+before any real-money deployment.
 
 ---
 
 ## 🧠 WHAT THIS PROJECT DOES
-# Options_ORB_Automation
 
-Fully automated **15-minute Opening Range Breakout (ORB)** strategy for **NIFTY options**
-using **tick-by-tick Kite data**, implemented in **paper-trading mode**.
+- Trades **NIFTY ATM options** using a **15-minute ORB** (9:15–9:30)
+- Uses **spot price** for structure and stop-loss decisions
+- Executes **tick-by-tick** (no candle-close dependency)
+- Removes emotional execution via automation
+- Logs every trade and generates **intraday & end-of-day summaries**
+- Provides a foundation to evaluate **strategy health**, not just P&L
 
-This project removes emotional execution and validates ORB behaviour
-before going live.
+> ⚠️ Current mode: **Paper trading only** (no real orders placed)
 
 ---
 
-## FEATURES
+## ✅ KEY FEATURES
 
 ✔ Tick-by-tick WebSocket data  
 ✔ Automatic ORB calculation (9:15–9:30)  
-✔ 45-second breakout acceptance  
+✔ Decisive breakout + hold validation  
 ✔ CE & PE handling  
 ✔ Session-only volume filter  
 ✔ Automatic ATM strike selection  
-✔ Trailing SL + 2R target  
-✔ Re-entry cooldown (anti-chop)  
-✔ Daily max-loss kill switch  
-✔ Excel/CSV trade logging  
+✔ **Spot re-entry as priority-1 SL**  
+✔ **Progressive + dynamic R-based trailing SL**  
+✔ One re-entry per direction (anti-chop)  
+✔ Higher volume required on re-entry  
+✔ Time-based entry filters  
+✔ Daily SL-based kill switch  
+✔ CSV-based paper trading (Excel friendly)  
+✔ Auto-generated intraday & daily summaries  
 
 ---
 
-## STRATEGY LOGIC
+## ⏱️ TRADING TIME RULES
 
-### ENTRY
-- Break above ORB High → Buy ATM CE  
-- Break below ORB Low → Buy ATM PE  
-- Price must hold beyond ORB for 45 seconds  
-- Volume must expand vs session average  
+**New Entries**
+- Allowed only between **9:30 – 11:00 AM**
 
-### EXIT
-- Trailing SL
-- Target = 2 × risk
-- Kill switch on daily loss
+**Re-Entries**
+- Allowed only until **10:45 AM**
+- Only **one re-entry per direction**
+- Re-entry must show **higher volume** than the first breakout
+
+**Open Trades**
+- No forced exit based on time  
+- Trades are managed until SL or trailing exit
 
 ---
 
-## FILE STRUCTURE
+## 📈 STRATEGY LOGIC
 
- designed for validation before going live.
+### ORB DEFINITION
+- Opening Range = **first 3 × 5-minute candles** (9:15–9:30)
+- ORB High & Low computed automatically from historical data
+
+---
+
+### ENTRY CONDITIONS (ALL MUST BE TRUE)
+
+**For CE**
+- Spot breaks **above ORB High + buffer**
+- Price **holds above ORB** for:
+  - 45 seconds (first entry)
+  - 60 seconds (re-entry)
+- Price does **not snap back** into ORB during hold
+- Volume expands vs session average
+- Entry time within allowed window
+
+**For PE**
+- Mirror logic below ORB Low
+
+---
+
+### EXIT CONDITIONS (STRICT PRIORITY)
+
+**Priority-1: Structural SL**
+- Spot **re-enters ORB range**
+- Immediate exit (no candle wait)
+
+**Priority-2: Profit Protection**
+- Progressive R-based trailing SL
+- Dynamic ratcheting beyond +4R
+- No fixed profit cap
+
+**Risk Controls**
+- Stop trading after **2 SLs per day**
+- Daily P&L kill switch as backup
+
+---
+
+## 🔁 RE-ENTRY RULES (ANTI-CHOP)
+
+- Only **ONE re-entry per direction**
+- Re-entry must:
+  - Hold longer (60s)
+  - Show **higher volume than first breakout**
+  - Occur before **10:45 AM**
+- Cooldown enforced between attempts
+
+---
+
+## 📊 LOGGING & ANALYTICS
+
+All trading is **paper-based** and logged automatically.
+
+### Files Generated
+
+| File | Purpose |
+|----|-------|
+| `paper_trades.csv` | Raw trade-by-trade log |
+| `intraday_summary.csv` | Rolling intraday P&L + trade count |
+| `daily_summary.csv` | End-of-day performance snapshot |
+
+### Daily Summary Includes
+- Trades taken
+- Wins / losses / breakeven
+- Net P&L
+- Max win / max loss
+- SL count
+
+All files are **Excel friendly**.
 
 ---
 
 ## 📁 PROJECT STRUCTURE
-
-orb_paper_trading/
-├── config.py # All strategy + API config
-├── kite_connection.py # Kite Connect + WebSocket setup
-├── instruments.py # NIFTY option strike selector
-├── orb_logic.py # ORB & hold logic
-├── paper_engine.py # Entry/exit + kill switch
-├── logger.py # CSV logging + summary
-├── main.py # Tick handler + strategy engine
-├── paper_trades.csv # Auto-generated trade log
-└── daily_summary.csv # Auto-generated daily P&L
-
+```
+Options_ORB_Automation/
+├── config.py              # Strategy parameters & API config
+├── kite_connection.py     # Kite Connect + WebSocket setup
+├── instruments.py         # ATM option strike selection
+├── orb_logic.py           # ORB, hold, and volume logic
+├── paper_engine.py        # Entry/exit, trailing SL, kill switch
+├── logger.py              # Trade logging + summaries
+├── main.py                # Tick handler + strategy engine
+├── paper_trades.csv       # Auto-generated trade log
+├── intraday_summary.csv   # Auto-generated intraday stats
+└── daily_summary.csv      # Auto-generated daily summary
+```
 
 ---
 
 ## 🚀 HOW TO RUN (PAPER MODE)
 
-1. Install dependencies:
+1️⃣ Install Dependencies  
+pip install kiteconnect pandas
 
-   ```bash
-   pip install kiteconnect pandas
+2️⃣ Configure API  
 
+Fill in your Kite credentials in config.py:
 
-Fill in config.py with your Kite API key & token.
+API_KEY = "your_key"  
+ACCESS_TOKEN = "your_token"
 
-Run the bot:
-
+3️⃣ Run the Bot  
 python main.py
 
+4️⃣ Review Results  
 
-After the session, open:
+paper_trades.csv → Detailed trade-by-trade history  
+daily_summary.csv → Day-wise performance summary  
 
-paper_trades.csv → Detailed trade log
-
-daily_summary.csv → Daily performance summary
-
-🧠 STRATEGY RULES
-
-Entry conditions
-
-Spot breaks above ORB high (for CE) or below ORB low (for PE)
-
-Price stays on that side for 45 seconds
-
-Heavy enough volume compared with session data
-
-Exit conditions
-
-Spot re-enters ORB range → Exit (SL)
-
-Target (fixed or trailing) hit → Exit
-
-Kill-switch triggers → Stop trading
-
-📌 NOTES
-
-This repo is paper-trading only. ✔
-
-Real (broker) order placement is not implemented yet.
-
-Logging is automatic; no manual logging needed.
-
-📈 NEXT STEPS
-
-Once validated, you can:
-✔ Add real orders
-✔ Add PUT & CALL simultaneous handling
-✔ Enhance analytics dashboards
-✔ Deploy on VPS for live monitoring
-
-❗ DISCLAIMER
-
-Trading financial markets involves risk. This bot is for educational and testing purposes.
-Do NOT deploy without proper understanding and validation.
-
+All files are auto-generated and Excel-friendly.
 
 ---
 
-## 🛠️ SUGGESTED TWEAKS FOR YOUR PROJECT
+## 🧠 STRATEGY PHILOSOPHY
 
-Here are a few *improvements you might want to add* to make the code more robust:
+- Low win-rate, high R-multiple system  
+- Edge comes from trend days, not frequency  
+- Focus is on behavioural validation, not curve fitting  
+- Designed to survive choppy market regimes via strict filters  
 
-### 1️⃣ **Automatically compute ORB range**
-Right now `orb_high` and `orb_low` might be manually set — automate them from 5-min candles using Kite historical API.
-
-> Build 5-min ORB from 9:15–9:30 each day programmatically.
-
----
-
-### 2️⃣ **Add PUT side handling**
-Your current `main.py` only checks bullish direction.  
-Add bearish entry for PE as we discussed earlier.
+This system prioritizes process quality and rule adherence over short-term profits.
 
 ---
 
-### 3️⃣ **Volume filter integration**
-Ensure `volume_ok()` logic uses session volumes — right now there’s no such function in main.py.
+## ⚠️ IMPORTANT NOTES
 
-> Add a rolling volume buffer via ticks & 5-min buckets.
-
----
-
-### 4️⃣ **Trailing SL / Target logic**
-Right now paper exit is only spot re-entry SL.  
-Add dynamic target + trailing SL for more realistic backtests.
+- This repository is paper trading only  
+- No live orders are placed  
+- Do NOT deploy live without:
+  - Multi-week paper validation  
+  - Drawdown analysis  
+  - Strategy health review  
 
 ---
 
-### 5️⃣ **Re-entry cooldown**
-You should enforce a short cooldown + global re-entry count — safe guard against rapid second entries.
+## 📈 NEXT STEPS (OPTIONAL)
 
+Once validated, you can extend this system to:
+
+- Live order placement
+  
 ---
 
-### 6️⃣ **Error handling**
-Wrap API calls (`kite.ltp`, websocket) with try/except to handle disconnects.
+## ❗ DISCLAIMER
 
----
+Trading financial markets involves substantial risk.  
+This project is for educational and testing purposes only.  
+
+The author is not responsible for any financial losses incurred by using this code.
